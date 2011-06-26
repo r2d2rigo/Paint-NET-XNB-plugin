@@ -21,6 +21,6 @@ namespace PdnXnb
             data = new byte[DataSize];
         }
 
-        public abstract BasePixel ToRgba();
+        public abstract BasePixel ToRgba(bool bigEndian);
     }
 }
