@@ -4,6 +4,7 @@ using System.IO;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
+using System.Collections.Generic;
 
 namespace PdnXnb
 {
@@ -33,9 +34,9 @@ namespace PdnXnb
                 return Document.FromImage(defaultBitmap);
             }
 
-            byte platform = reader.ReadByte();
+            char platform = Convert.ToChar(reader.ReadByte());
 
-            if (platform != 0x77 && platform != 0x6D)
+            if (platform != 'w' && platform != 'm' && platform != 'x')
             {
                 MessageBox.Show("XNB target platform not supported.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return Document.FromImage(defaultBitmap);
@@ -67,7 +68,7 @@ namespace PdnXnb
             {
                 MessageBox.Show("XNB invalid version, only 4.0.0.0 supported.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return Document.FromImage(defaultBitmap);
-            }
+            }       
 
             reader.ReadBytes(6);
 
@@ -107,7 +108,7 @@ namespace PdnXnb
                     {
                         for (int j = 0; j < dataSize / 2; j++)
                         {
-                            Array.Copy(new Bgr565Pixel(data.Subarray(j * 2, 2)).ToRgba().Data, 0, finalData, j * 4, 4);
+                            Array.Copy(new Bgr565Pixel(data.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
                         }
                     }
                     break;
@@ -115,7 +116,7 @@ namespace PdnXnb
                     {
                         for (int j = 0; j < dataSize / 2; j++)
                         {
-                            Array.Copy(new Bgra4444Pixel(data.Subarray(j * 2, 2)).ToRgba().Data, 0, finalData, j * 4, 4);
+                            Array.Copy(new Bgra4444Pixel(data.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
                         }
                     }
                     break;
@@ -123,13 +124,16 @@ namespace PdnXnb
                     {
                         for (int j = 0; j < dataSize / 2; j++)
                         {
-                            Array.Copy(new Bgra5551Pixel(data.Subarray(j * 2, 2)).ToRgba().Data, 0, finalData, j * 4, 4);
+                            Array.Copy(new Bgra5551Pixel(data.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
                         }
                     }
                     break;
                 case PixelFormat.Rgba:
                     {
-                        finalData = data;
+                        for (int j = 0; j < dataSize / 4; j++)
+                        {
+                            Array.Copy(new RgbaPixel(data.Subarray(j * 4, 4)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                        }
 
                         // GDI bitmap is Bgra
                         for (int j = 0; j < dataSize; j += 4)
@@ -147,7 +151,7 @@ namespace PdnXnb
             finalBitmap.UnlockBits(bmpData);
 
             reader.Close();
-
+            
             return Document.FromImage(finalBitmap);
         }
     }

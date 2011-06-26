@@ -7,8 +7,6 @@ namespace PdnXnb
 {
     public class Bgr565Pixel : BasePixel
     {
-        private byte[] bgr565data;
-
         public override int DataSize
         {
             get { return 2; }
@@ -19,10 +17,10 @@ namespace PdnXnb
             this.Data = pixelData;
         }
 
-        public override BasePixel ToRgba()
+        public override BasePixel ToRgba(bool bigEndian)
         {
-            byte upperByte = Data[1];
-            byte lowerByte = Data[0];
+            byte upperByte = bigEndian == true ? Data[0] : Data[1];
+            byte lowerByte = bigEndian == true ? Data[1] : Data[0];
 
             byte[] newData = new byte[4];
 
