@@ -36,6 +36,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="ManagedSquish, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL" />
     <Reference Include="PaintDotNet.Base">
       <HintPath>C:\Program Files\Paint.NET\PaintDotNet.Base.dll</HintPath>
     </Reference>
@@ -51,6 +52,7 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Alpha8Pixel.cs" />
     <Compile Include="BasePixel.cs" />
     <Compile Include="Bgr565Pixel.cs" />
     <Compile Include="Bgra4444Pixel.cs" />
@@ -61,9 +63,22 @@
     <Compile Include="PixelFormat.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="ManagedSquish.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="squish.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="squish64.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy "$(TargetPath)" "C:\Program Files\Paint.NET\FileTypes\$(TargetFileName)"</PostBuildEvent>
+    <PostBuildEvent>copy "$(TargetPath)" "C:\Program Files\Paint.NET\FileTypes\$(TargetFileName)"
+copy "$(TargetDir)squish.dll" "C:\Program Files\Paint.NET\FileTypes\squish.dll"
+copy "$(TargetDir)squish64.dll" "C:\Program Files\Paint.NET\FileTypes\squish64.dll"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

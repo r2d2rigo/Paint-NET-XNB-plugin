@@ -74,7 +74,7 @@ namespace PdnXnb
 
             PixelFormat imageFormat = (PixelFormat)reader.ReadInt32();
 
-            if (imageFormat != PixelFormat.Rgba && imageFormat != PixelFormat.Bgr565 && imageFormat != PixelFormat.Bgra4444 && imageFormat != PixelFormat.Bgra5551)
+            if (!IsSupportedPixelFormat(imageFormat))
             {
                 MessageBox.Show("Pixel format " + imageFormat.ToString() + " not supported.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return Document.FromImage(defaultBitmap);
@@ -91,24 +91,48 @@ namespace PdnXnb
 
             Bitmap finalBitmap = new Bitmap(width, height);
 
-            int sourceX = 0;
-            int rectWidth = width;
-            int rectHeight = height;
-
             int dataSize = reader.ReadInt32();
 
-            byte[] data = new byte[dataSize];
-            data = reader.ReadBytes(dataSize);
+            byte[] sourceData = new byte[dataSize];
+            sourceData = reader.ReadBytes(dataSize);
 
             byte[] finalData = new byte[width * height * 4];
 
+            bool needsSwapping = false;
+
             switch (imageFormat)
             {
+                case PixelFormat.Alpha8:
+                    {
+                        for (int j = 0; j < dataSize; j++)
+                        {
+                            Array.Copy(new Alpha8Pixel(sourceData.Subarray(j, 1)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                        }
+                    }
+                    break;
+                case PixelFormat.Dxt1:
+                    {
+                        finalData = ManagedSquish.SquishWrapper.DecompressImage(sourceData, width, height, SquishFlags.Dxt1);
+                        needsSwapping = true;
+                    }
+                    break;
+                case PixelFormat.Dxt3:
+                    {
+                        finalData = ManagedSquish.SquishWrapper.DecompressImage(sourceData, width, height, SquishFlags.Dxt3);
+                        needsSwapping = true;
+                    }
+                    break;
+                case PixelFormat.Dxt5:
+                    {
+                        finalData = ManagedSquish.SquishWrapper.DecompressImage(sourceData, width, height, SquishFlags.Dxt5);
+                        needsSwapping = true;
+                    }
+                    break;
                 case PixelFormat.Bgr565:
                     {
                         for (int j = 0; j < dataSize / 2; j++)
                         {
-                            Array.Copy(new Bgr565Pixel(data.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                            Array.Copy(new Bgr565Pixel(sourceData.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
                         }
                     }
                     break;
@@ -116,7 +140,7 @@ namespace PdnXnb
                     {
                         for (int j = 0; j < dataSize / 2; j++)
                         {
-                            Array.Copy(new Bgra4444Pixel(data.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                            Array.Copy(new Bgra4444Pixel(sourceData.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
                         }
                     }
                     break;
@@ -124,7 +148,7 @@ namespace PdnXnb
                     {
                         for (int j = 0; j < dataSize / 2; j++)
                         {
-                            Array.Copy(new Bgra5551Pixel(data.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                            Array.Copy(new Bgra5551Pixel(sourceData.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
                         }
                     }
                     break;
@@ -132,27 +156,49 @@ namespace PdnXnb
                     {
                         for (int j = 0; j < dataSize / 4; j++)
                         {
-                            Array.Copy(new RgbaPixel(data.Subarray(j * 4, 4)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                            Array.Copy(new RgbaPixel(sourceData.Subarray(j * 4, 4)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
                         }
 
-                        // GDI bitmap is Bgra
-                        for (int j = 0; j < dataSize; j += 4)
-                        {
-                            byte tmp = finalData[j];
-                            finalData[j] = finalData[j + 2];
-                            finalData[j + 2] = tmp;
-                        }
+                        needsSwapping = true;
                     }
                     break;
             }
 
-            BitmapData bmpData = finalBitmap.LockBits(new Rectangle(sourceX, 0, rectWidth, rectHeight), System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            if (needsSwapping)
+            {
+                for (int j = 0; j < finalData.Length; j += 4)
+                {
+                    byte tmp = finalData[j];
+                    finalData[j] = finalData[j + 2];
+                    finalData[j + 2] = tmp;
+                }
+            }
+
+            BitmapData bmpData = finalBitmap.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
             System.Runtime.InteropServices.Marshal.Copy(finalData, 0, bmpData.Scan0, finalData.Length);
             finalBitmap.UnlockBits(bmpData);
 
             reader.Close();
             
             return Document.FromImage(finalBitmap);
+        }
+
+        private bool IsSupportedPixelFormat(PixelFormat format)
+        {
+            switch (format)
+            {
+                case PixelFormat.Alpha8:
+                case PixelFormat.Bgr565:
+                case PixelFormat.Bgra4444:
+                case PixelFormat.Bgra5551:
+                case PixelFormat.Dxt1:
+                case PixelFormat.Dxt3:
+                case PixelFormat.Dxt5:
+                case PixelFormat.Rgba:
+                    return true;
+                default:
+                    return false;
+            }
         }
     }
 }
