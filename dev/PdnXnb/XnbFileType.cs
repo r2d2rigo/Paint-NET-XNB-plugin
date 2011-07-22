@@ -42,11 +42,17 @@ namespace PdnXnb
                 return Document.FromImage(defaultBitmap);
             }
 
-            ushort version = reader.ReadUInt16();
-            int ver = version & 0x80ff;
-            int profile = version & 0x7f00;
+            byte xnbVersion = reader.ReadByte();
 
-            if (ver == 0x8005)
+            if (xnbVersion != 0x05)
+            {
+                MessageBox.Show("XNB version not supported.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return Document.FromImage(defaultBitmap);
+            }
+
+            byte flags = reader.ReadByte();
+
+            if (flags == 0x80)
             {
                 MessageBox.Show("Compressed XNB not supported.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return Document.FromImage(defaultBitmap);
@@ -54,7 +60,7 @@ namespace PdnXnb
 
             int totalLength = reader.ReadInt32();
 
-            reader.ReadByte();
+            byte numTypeReaders = reader.ReadByte();
 
             string type = reader.ReadString();
 
@@ -68,9 +74,12 @@ namespace PdnXnb
             {
                 MessageBox.Show("XNB invalid version, only 4.0.0.0 supported.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return Document.FromImage(defaultBitmap);
-            }       
+            }
 
-            reader.ReadBytes(6);
+            int typeVersion = reader.ReadInt32();
+
+            byte numSharedResources = reader.ReadByte();
+            byte nullSharedREsource = reader.ReadByte();
 
             PixelFormat imageFormat = (PixelFormat)reader.ReadInt32();
 
@@ -84,103 +93,134 @@ namespace PdnXnb
             int height = reader.ReadInt32();
             int numLevels = reader.ReadInt32();
 
+            Bitmap finalBitmap;
+
+            Point[] mipmapSizes = GetMipmapSizes(width, height);
+
+            int canvasWidth = 0;
+            for (int i = 0; i < mipmapSizes.Length; i++)
+            {
+                canvasWidth += mipmapSizes[i].X;
+            }
+
             if (numLevels > 1)
             {
-                MessageBox.Show("Image contains mipmaps but won't be loaded.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                finalBitmap = new Bitmap(canvasWidth, height);
+            }
+            else
+            {
+                finalBitmap = new Bitmap(width, height);
             }
 
-            Bitmap finalBitmap = new Bitmap(width, height);
+            int rectX = 0;
 
-            int dataSize = reader.ReadInt32();
-
-            byte[] sourceData = new byte[dataSize];
-            sourceData = reader.ReadBytes(dataSize);
-
-            byte[] finalData = new byte[width * height * 4];
-
-            bool needsSwapping = false;
-
-            switch (imageFormat)
+            for (int i = 0; i < numLevels; i++)
             {
-                case PixelFormat.Alpha8:
-                    {
-                        for (int j = 0; j < dataSize; j++)
-                        {
-                            Array.Copy(new Alpha8Pixel(sourceData.Subarray(j, 1)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
-                        }
-                    }
-                    break;
-                case PixelFormat.Dxt1:
-                    {
-                        finalData = ManagedSquish.SquishWrapper.DecompressImage(sourceData, width, height, SquishFlags.Dxt1);
-                        needsSwapping = true;
-                    }
-                    break;
-                case PixelFormat.Dxt3:
-                    {
-                        finalData = ManagedSquish.SquishWrapper.DecompressImage(sourceData, width, height, SquishFlags.Dxt3);
-                        needsSwapping = true;
-                    }
-                    break;
-                case PixelFormat.Dxt5:
-                    {
-                        finalData = ManagedSquish.SquishWrapper.DecompressImage(sourceData, width, height, SquishFlags.Dxt5);
-                        needsSwapping = true;
-                    }
-                    break;
-                case PixelFormat.Bgr565:
-                    {
-                        for (int j = 0; j < dataSize / 2; j++)
-                        {
-                            Array.Copy(new Bgr565Pixel(sourceData.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
-                        }
-                    }
-                    break;
-                case PixelFormat.Bgra4444:
-                    {
-                        for (int j = 0; j < dataSize / 2; j++)
-                        {
-                            Array.Copy(new Bgra4444Pixel(sourceData.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
-                        }
-                    }
-                    break;
-                case PixelFormat.Bgra5551:
-                    {
-                        for (int j = 0; j < dataSize / 2; j++)
-                        {
-                            Array.Copy(new Bgra5551Pixel(sourceData.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
-                        }
-                    }
-                    break;
-                case PixelFormat.Rgba:
-                    {
-                        for (int j = 0; j < dataSize / 4; j++)
-                        {
-                            Array.Copy(new RgbaPixel(sourceData.Subarray(j * 4, 4)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
-                        }
+                int mipmapWidth = mipmapSizes[i].X;
+                int mipmapHeight = mipmapSizes[i].Y;
 
-                        needsSwapping = true;
-                    }
-                    break;
-            }
+                int dataSize = reader.ReadInt32();
 
-            if (needsSwapping)
-            {
-                for (int j = 0; j < finalData.Length; j += 4)
+                byte[] sourceData = new byte[dataSize];
+                sourceData = reader.ReadBytes(dataSize);
+
+                byte[] finalData = new byte[mipmapWidth * mipmapHeight * 4];
+
+                bool needsSwapping = false;
+
+                switch (imageFormat)
                 {
-                    byte tmp = finalData[j];
-                    finalData[j] = finalData[j + 2];
-                    finalData[j + 2] = tmp;
+                    case PixelFormat.Alpha8:
+                        {
+                            for (int j = 0; j < dataSize; j++)
+                            {
+                                Array.Copy(new Alpha8Pixel(sourceData.Subarray(j, 1)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                            }
+                        }
+                        break;
+                    case PixelFormat.Dxt1:
+                        {
+                            finalData = ManagedSquish.SquishWrapper.DecompressImage(sourceData, mipmapWidth, mipmapHeight, SquishFlags.Dxt1);
+                            needsSwapping = true;
+                        }
+                        break;
+                    case PixelFormat.Dxt3:
+                        {
+                            finalData = ManagedSquish.SquishWrapper.DecompressImage(sourceData, mipmapWidth, mipmapHeight, SquishFlags.Dxt3);
+                            needsSwapping = true;
+                        }
+                        break;
+                    case PixelFormat.Dxt5:
+                        {
+                            finalData = ManagedSquish.SquishWrapper.DecompressImage(sourceData, mipmapWidth, mipmapHeight, SquishFlags.Dxt5);
+                            needsSwapping = true;
+                        }
+                        break;
+                    case PixelFormat.Bgr565:
+                        {
+                            for (int j = 0; j < dataSize / 2; j++)
+                            {
+                                Array.Copy(new Bgr565Pixel(sourceData.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                            }
+                        }
+                        break;
+                    case PixelFormat.Bgra4444:
+                        {
+                            for (int j = 0; j < dataSize / 2; j++)
+                            {
+                                Array.Copy(new Bgra4444Pixel(sourceData.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                            }
+                        }
+                        break;
+                    case PixelFormat.Bgra5551:
+                        {
+                            for (int j = 0; j < dataSize / 2; j++)
+                            {
+                                Array.Copy(new Bgra5551Pixel(sourceData.Subarray(j * 2, 2)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                            }
+                        }
+                        break;
+                    case PixelFormat.Rgba:
+                        {
+                            for (int j = 0; j < dataSize / 4; j++)
+                            {
+                                Array.Copy(new RgbaPixel(sourceData.Subarray(j * 4, 4)).ToRgba((platform == 'x')).Data, 0, finalData, j * 4, 4);
+                            }
+
+                            needsSwapping = true;
+                        }
+                        break;
                 }
+
+                if (needsSwapping)
+                {
+                    for (int j = 0; j < finalData.Length; j += 4)
+                    {
+                        byte tmp = finalData[j];
+                        finalData[j] = finalData[j + 2];
+                        finalData[j + 2] = tmp;
+                    }
+                }
+
+                BitmapData bmpData = finalBitmap.LockBits(new Rectangle(rectX, 0, mipmapWidth, mipmapHeight), System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                for (int j = 0; j < mipmapHeight; j++)
+                {
+                    System.Runtime.InteropServices.Marshal.Copy(finalData, mipmapWidth * j * 4, new IntPtr(bmpData.Scan0.ToInt32() + (bmpData.Stride * j)), mipmapWidth * 4);
+                }
+                finalBitmap.UnlockBits(bmpData);
+
+                rectX += mipmapWidth;
+            }
+            reader.Close();
+
+            Document newDocument = Document.FromImage(finalBitmap);
+
+            if (numLevels > 1)
+            {
+                newDocument.Metadata.SetUserValue("Mipmaps", "true");
             }
 
-            BitmapData bmpData = finalBitmap.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-            System.Runtime.InteropServices.Marshal.Copy(finalData, 0, bmpData.Scan0, finalData.Length);
-            finalBitmap.UnlockBits(bmpData);
-
-            reader.Close();
-            
-            return Document.FromImage(finalBitmap);
+            return newDocument;
         }
 
         private bool IsSupportedPixelFormat(PixelFormat format)
@@ -199,6 +239,28 @@ namespace PdnXnb
                 default:
                     return false;
             }
+        }
+
+        private Point[] GetMipmapSizes(int width, int height)
+        {
+            List<Point> sizes = new List<Point>();
+
+            sizes.Add(new Point(width, height));
+
+            while (width != 1 && height != 1)
+            {
+                width /= 2;
+                if (width < 1)
+                    width = 1;
+
+                height /= 2;
+                if (height < 1)
+                    height = 1;
+
+                sizes.Add(new Point(width, height));
+            }
+
+            return sizes.ToArray();
         }
     }
 }
