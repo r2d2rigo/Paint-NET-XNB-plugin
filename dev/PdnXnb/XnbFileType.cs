@@ -5,10 +5,13 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
 using System.Collections.Generic;
+using PaintDotNet.IndirectUI;
+using PaintDotNet.PropertySystem;
+using PaintDotNet.Data.Dds;
 
 namespace PdnXnb
 {
-    public class XnbFileType : FileType
+    public class XnbFileType : PropertyBasedFileType
     {
         private static Bitmap defaultBitmap;
 
@@ -18,7 +21,7 @@ namespace PdnXnb
         }
 
         public XnbFileType()
-            : base("XNB", FileTypeFlags.SupportsLoading, new string[] { ".xnb" })
+            : base("XNB", FileTypeFlags.SupportsSaving | FileTypeFlags.SupportsLoading, new string[] { ".xnb" })
         {
         }
 
@@ -223,6 +226,80 @@ namespace PdnXnb
             return newDocument;
         }
 
+        public override ControlInfo OnCreateSaveConfigUI(PropertyCollection props)
+        {
+            ControlInfo saveWindow = PropertyBasedFileType.CreateDefaultSaveConfigUI(props);
+
+            foreach (PixelFormat format in Enum.GetValues(typeof(PixelFormat)))
+            {
+                if (IsSupportedPixelFormat(format))
+                {
+                    saveWindow.FindControlForPropertyName(PropertyNames.FileFormat).SetValueDisplayName(format, format.ToString());
+                }
+            }
+            //saveWindow.SetPropertyControlType(PropertyNames.CompressorType, PropertyControlType.RadioButton);
+            //saveWindow.FindControlForPropertyName(PropertyNames.CompressorType).SetValueDisplayName(DdsCompressorType.RangeFit, PdnResources.GetString("DdsFileType.SaveConfigWidget.RangeFit.Text"));
+            //saveWindow.FindControlForPropertyName(PropertyNames.CompressorType).SetValueDisplayName(DdsCompressorType.ClusterFit, PdnResources.GetString("DdsFileType.SaveConfigWidget.ClusterFit.Text"));
+            //saveWindow.FindControlForPropertyName(PropertyNames.CompressorType).SetValueDisplayName(DdsCompressorType.IterativeFit, PdnResources.GetString("DdsFileType.SaveConfigWidget.IterativeFit.Text"));
+            //saveWindow.SetPropertyControlType(PropertyNames.ErrorMetric, PropertyControlType.RadioButton);
+            //saveWindow.FindControlForPropertyName(PropertyNames.ErrorMetric).SetValueDisplayName(DdsErrorMetric.Perceptual, PdnResources.GetString("DdsFileType.SaveConfigWidget.Perceptual.Text"));
+            //saveWindow.FindControlForPropertyName(PropertyNames.ErrorMetric).SetValueDisplayName(DdsErrorMetric.Uniform, PdnResources.GetString("DdsFileType.SaveConfigWidget.Uniform.Text"));
+            //saveWindow.SetPropertyControlValue(PropertyNames.GenerateMipMaps, ControlInfoPropertyNames.DisplayName, string.Empty);
+            //saveWindow.SetPropertyControlValue(PropertyNames.GenerateMipMaps, ControlInfoPropertyNames.Description, PdnResources.GetString("DdsFileType.SaveConfigWidget.GenerateMipMaps.Text"));
+            //saveWindow.SetPropertyControlValue(PropertyNames.WeightColorByAlpha, ControlInfoPropertyNames.DisplayName, PdnResources.GetString("DdsFileType.SaveConfigWidget.AdditionalOptions.Text"));
+            //saveWindow.SetPropertyControlValue(PropertyNames.WeightColorByAlpha, ControlInfoPropertyNames.Description, PdnResources.GetString("DdsFileType.SaveConfigWidget.WeightColourByAlpha"));
+            //saveWindow.SetPropertyControlValue(PropertyNames.MipMapResamplingAlgorithm, ControlInfoPropertyNames.DisplayName, string.Empty);
+            //saveWindow.FindControlForPropertyName(PropertyNames.MipMapResamplingAlgorithm).SetValueDisplayName(ResamplingAlgorithm.SuperSampling, PdnResources.GetString("DdsFileType.SaveConfigWidget.MipMapResamplingAlgorithm.SuperSampling"));
+            //saveWindow.FindControlForPropertyName(PropertyNames.MipMapResamplingAlgorithm).SetValueDisplayName(ResamplingAlgorithm.Bicubic, PdnResources.GetString("DdsFileType.SaveConfigWidget.MipMapResamplingAlgorithm.Bicubic"));
+            //saveWindow.FindControlForPropertyName(PropertyNames.MipMapResamplingAlgorithm).SetValueDisplayName(ResamplingAlgorithm.Bilinear, PdnResources.GetString("DdsFileType.SaveConfigWidget.MipMapResamplingAlgorithm.Bilinear"));
+            //saveWindow.FindControlForPropertyName(PropertyNames.MipMapResamplingAlgorithm).SetValueDisplayName(ResamplingAlgorithm.NearestNeighbor, PdnResources.GetString("DdsFileType.SaveConfigWidget.MipMapResamplingAlgorithm.NearestNeighbor"));
+
+            return saveWindow;
+        }
+
+        public override PropertyCollection OnCreateSavePropertyCollection()
+        {
+            List<Property> props = new List<Property>
+            {
+                StaticListChoiceProperty.CreateForEnum<PixelFormat>(PropertyNames.FileFormat, PixelFormat.Rgba, false),
+                //new StaticListChoiceProperty((PropertyNames) 1, new object[] { (DdsCompressorType) 1, (DdsCompressorType) 0, (DdsCompressorType) 2 }, 1),
+                //new StaticListChoiceProperty((PropertyNames) 2, new object[] { (DdsErrorMetric) 1, (DdsErrorMetric) 0 }, 1),
+                //new BooleanProperty(((PropertyNames) 3, 0, 1),
+                //new BooleanProperty((PropertyNames) 4, 0),
+                //new StaticListChoiceProperty((PropertyNames) 5, new object[] { (ResamplingAlgorithm) 3, (ResamplingAlgorithm) 1, (ResamplingAlgorithm) 2, (ResamplingAlgorithm) 0 }, 0)
+            };
+
+            List<PropertyCollectionRule> rules = new List<PropertyCollectionRule> {
+                //new ReadOnlyBoundToValueRule<object, StaticListChoiceProperty>((PropertyNames) 2, (PropertyNames) 0, new object[] { (DdsFileFormat) 5, (DdsFileFormat) 3, (DdsFileFormat) 8, (DdsFileFormat) 7, (DdsFileFormat) 10, (DdsFileFormat) 9, (DdsFileFormat) 6, (DdsFileFormat) 4 }, 0),
+                //new ReadOnlyBoundToValueRule<object, StaticListChoiceProperty>((PropertyNames) 1, (PropertyNames) 0, new object[] { (DdsFileFormat) 5, (DdsFileFormat) 3, (DdsFileFormat) 8, (DdsFileFormat) 7, (DdsFileFormat) 10, (DdsFileFormat) 9, (DdsFileFormat) 6, (DdsFileFormat) 4 }, 0)
+            };
+
+            //Pair<object, object>[] CS$0$0005 = new Pair<object, object>[] { Pair.Create<object, object>(PropertyNames.FileFormat, DdsFileFormat.DDS_FORMAT_A8B8G8R8), Pair.Create<object, object>(PropertyNames.FileFormat, DdsFileFormat.DDS_FORMAT_A8R8G8B8), Pair.Create<object, object>(PropertyNames.FileFormat, DdsFileFormat.DDS_FORMAT_A4R4G4B4), Pair.Create<object, object>(PropertyNames.FileFormat, DdsFileFormat.DDS_FORMAT_A1R5G5B5), Pair.Create<object, object>(PropertyNames.FileFormat, DdsFileFormat.DDS_FORMAT_R5G6B5), Pair.Create<object, object>(PropertyNames.FileFormat, DdsFileFormat.DDS_FORMAT_R8G8B8), Pair.Create<object, object>(PropertyNames.FileFormat, DdsFileFormat.DDS_FORMAT_X8B8G8R8), Pair.Create<object, object>(PropertyNames.FileFormat, DdsFileFormat.DDS_FORMAT_X8R8G8B8), Pair.Create<object, object>(PropertyNames.CompressorType, DdsCompressorType.RangeFit) };
+            //rules.Add(new ReadOnlyBoundToNameValuesRule(PropertyNames.WeightColorByAlpha, false, CS$0$0005));
+            //rules.Add(new ReadOnlyBoundToBooleanRule(PropertyNames.MipMapResamplingAlgorithm, PropertyNames.GenerateMipMaps, true));
+            
+            return new PropertyCollection(props, rules);
+        }
+
+        protected override void OnSaveT(Document input, Stream output, PropertyBasedSaveConfigToken token, Surface scratchSurface, ProgressEventHandler callback)
+        {
+            scratchSurface.Clear(ColorBgra.Transparent);
+            using (RenderArgs ra = new RenderArgs(scratchSurface))
+            {
+                input.Render(ra, true);
+            }
+
+            token.GetProperty<StaticListChoiceProperty>(PropertyNames.FileFormat).Value = PixelFormat.Dxt5;
+
+            //DdsFileFormat fileFormat = (DdsFileFormat)token.GetProperty<StaticListChoiceProperty>(PropertyNames.FileFormat).Value;
+            //DdsCompressorType compressorType = (DdsCompressorType)token.GetProperty<StaticListChoiceProperty>(PropertyNames.CompressorType).Value;
+            //DdsErrorMetric errorMetric = (DdsErrorMetric)token.GetProperty<StaticListChoiceProperty>(PropertyNames.ErrorMetric).Value;
+            //bool weightColorByAlpha = token.GetProperty<BooleanProperty>(PropertyNames.WeightColorByAlpha).Value;
+            //bool generateMipMaps = token.GetProperty<BooleanProperty>(PropertyNames.GenerateMipMaps).Value;
+            //ResamplingAlgorithm mipMapResamplingAlgorithm = (ResamplingAlgorithm)token.GetProperty<StaticListChoiceProperty>(PropertyNames.MipMapResamplingAlgorithm).Value;
+            new DdsFile().Save(output, scratchSurface, DdsFileFormat.DDS_FORMAT_A8B8G8R8, DdsCompressorType.ClusterFit, DdsErrorMetric.Perceptual, false, ResamplingAlgorithm.Bicubic, false, null);
+        }
+
         private bool IsSupportedPixelFormat(PixelFormat format)
         {
             switch (format)
@@ -261,6 +338,11 @@ namespace PdnXnb
             }
 
             return sizes.ToArray();
+        }
+
+        public enum PropertyNames
+        {
+            FileFormat
         }
     }
 }
